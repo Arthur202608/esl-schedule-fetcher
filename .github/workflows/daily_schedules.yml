@@ -1,22 +1,19 @@
-name: Daily ESL Schedule
+name: 每日船期更新（ESL + ONE）
 
 on:
   schedule:
-    # 每日香港時間約 08:00（UTC 00:00）
-    - cron: "0 0 * * *"
-  workflow_dispatch:  # 允許手動觸發
+    - cron: "0 0 * * *"   # 每日 UTC 00:00 ≈ 香港 08:00
+  workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -26,23 +23,27 @@ jobs:
           playwright install chromium
           playwright install-deps chromium
 
-      - name: Run scraper
+      - name: Run ESL scraper
         run: python scrape_esl.py
+        continue-on-error: true
 
-      - name: Upload artifacts
+      - name: Run ONE scraper
+        run: python scrape_one.py
+
+      - name: Upload Excel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: esl-schedules
-          path: output/
+          name: schedules-xlsx
+          path: output/*.xlsx
           retention-days: 30
 
-      - name: Commit results (optional)
+      - name: Commit Excel results
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add output/
-          git diff --staged --quiet || git commit -m "chore: update ESL schedules $(date -u +%Y-%m-%d)"
+          mkdir -p output
+          git add output/*.xlsx || true
+          git diff --staged --quiet || git commit -m "chore: update schedules $(date -u +%Y-%m-%d)"
           git push
         env:
-          # 需要 repo 有 write 權限（見下面說明）
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
